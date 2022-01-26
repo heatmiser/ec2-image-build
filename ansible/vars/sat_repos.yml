@@ -1,17 +1,17 @@
 ---
 satellite_infra_workloads:
-  - theforeman.foreman.manifest
-  - theforeman.foreman.repositories
+  - redhat.satellite.manifest
+  - redhat.satellite.repositories
 
-server_url: "https://{{ ansible_fqdn }}"
-username: admin
-password: "{{ sat_pass }}"
-organization: "Default Organization"
+satellite_server_url: "https://{{ ansible_fqdn }}"
+satellite_username: admin
+satellite_password: "{{ sat_pass }}"
+satellite_organization: "Default Organization"
 validate_certs: false
 
-manifest_path: "/tmp/manifest.zip"
+satellite_manifest_path: "/tmp/manifest.zip"
 
-products:
+satellite_products:
   - name: Red Hat Enterprise Linux for x86_64
     sync: true
     repository_sets:
@@ -19,7 +19,7 @@ products:
         releasever: 8
       - name: Red Hat Enterprise Linux 8 for x86_64 - AppStream (RPMs)
         releasever: 8
-      - name: Red Hat Satellite Tools 6.8 for RHEL 8 x86_64 (RPMs)
+      - name: Red Hat Satellite Tools 6.10 for RHEL 8 x86_64 (RPMs)
   - name: Red Hat Enterprise Linux Server
     sync: true
     repository_sets:
@@ -30,9 +30,9 @@ products:
         basearch: x86_64
       - name: Red Hat Enterprise Linux 6 Server - Extras (RPMs)
         basearch: x86_64
-      - name: Red Hat Satellite Tools 6.8 (for RHEL 7 Server) (RPMs)
+      - name: Red Hat Satellite Tools 6.10 (for RHEL 7 Server) (RPMs)
         basearch: x86_64
-      - name: Red Hat Satellite Tools 6.8 (for RHEL 6 Server) (RPMs)
+      - name: Red Hat Satellite Tools 6.10 (for RHEL 6 Server) (RPMs)
         basearch: x86_64
   - name: Community Enterprise OS 7
     sync: true
