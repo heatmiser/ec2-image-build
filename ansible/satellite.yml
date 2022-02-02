@@ -58,7 +58,7 @@
   - name: subscription manager
     redhat_subscription:
       state: present
-      activationkey: AK-Sat
+      activationkey: "{{ satellite_activation_key }}"
       org_id: "{{ org_id }}"
       auto_attach: true
     tags:
@@ -132,17 +132,23 @@
     tags:
       - post_software
 
+  - name: sync repositories
+    include_role:
+      name: redhat.satellite.repositories
+    tags:
+      - post_software
+
   - name: install default scap content
     command: foreman-rake foreman_openscap:bulk_upload:default
 
   # work around for https://bugzilla.redhat.com/show_bug.cgi?id=1791340
-  #- name: workaround for bug 1791340
-  #  lineinfile:
-  #    path: /opt/theforeman/tfm/root/usr/share/gems/gems/smart_proxy_dynflow_core-0.2.6/smart_proxy_dynflow_core.gemspec
-  #    regexp: gem.authors
-  #    line: "  gem.authors       = ['Ivan Necas']"
-  #  tags:
-  #   - pos_software
+  - name: workaround for bug 1791340
+    lineinfile:
+      path: /opt/theforeman/tfm/root/usr/share/gems/gems/smart_proxy_dynflow_core-0.2.6/smart_proxy_dynflow_core.gemspec
+      regexp: gem.authors
+      line: "  gem.authors       = ['Ivan Necas']"
+    tags:
+     - post_software
 
   - name: motd
     copy:
@@ -195,35 +201,95 @@
     debug:
       msg: "The Org Id selected is: {{ sat_org_id[0] }}"
 
-  - name: hammer create RPM-GPG-KEY-CentOS-7 key
-    command: >-
-      hammer content-credentials create --organization-id {{ sat_org_id[0] }}
-      --path "/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-7"
-      --name "RPM-GPG-KEY-CentOS-7"
-      --content-type gpg_key
-    environment:
-      HOME: /root
+#  - name: hammer create RPM-GPG-KEY-CentOS-7 key
+#    command: >-
+#      hammer content-credentials create --organization-id {{ sat_org_id[0] }}
+#      --path "/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-7"
+#      --name "RPM-GPG-KEY-CentOS-7"
+#      --content-type gpg_key
+#    environment:
+#      HOME: /root
+#    register: hammer_centos7_gpgkey_result
+#    ignore_errors: true
+
+  - name: Create RPM-GPG-KEY-CentOS-7 key
+    redhat.satellite.content_credential:
+      name: "RPM-GPG-KEY-CentOS-7"
+      organization: "Default Organization"
+      content_type: gpg_key
+      content: "{{ lookup('file', '/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-7') }}"
+      server_url: "{{ satellite_server_url }}"
+      username: "{{ satellite_username }}"
+      password: "{{ sat_pass }}"
+      validate_certs: no
     register: hammer_centos7_gpgkey_result
-    ignore_errors: true
 
   - name: RPM-GPG-KEY-CentOS-7 key creation output
     debug:
-      msg: "{{ hammer_centos7_gpgkey_result.stdout }}"
+      msg: "{{ hammer_centos7_gpgkey_result }}"
 
-  - name: hammer create RPM-GPG-KEY-CentOS-8 key
-    command: >-
-      hammer content-credentials create --organization-id {{ sat_org_id[0] }}
-      --path "/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-Official"
-      --name "RPM-GPG-KEY-CentOS-8"
-      --content-type gpg_key
-    environment:
-      HOME: /root
+#  - name: hammer create RPM-GPG-KEY-CentOS-8 key
+#    command: >-
+#      hammer content-credentials create --organization-id {{ sat_org_id[0] }}
+#      --path "/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-Official"
+#      --name "RPM-GPG-KEY-CentOS-8"
+#      --content-type gpg_key
+#    environment:
+#      HOME: /root
+#    register: hammer_centos8_gpgkey_result
+#    ignore_errors: true
+
+  - name: Create RPM-GPG-KEY-CentOS-8 key
+    redhat.satellite.content_credential:
+      name: "RPM-GPG-KEY-CentOS-8"
+      organization: "Default Organization"
+      content_type: gpg_key
+      content: "{{ lookup('file', '/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-8') }}"
+      server_url: "{{ satellite_server_url }}"
+      username: "{{ satellite_username }}"
+      password: "{{ sat_pass }}"
+      validate_certs: no
     register: hammer_centos8_gpgkey_result
-    ignore_errors: true
 
   - name: RPM-GPG-KEY-CentOS-8 key creation output
     debug:
-      msg: "{{ hammer_centos8_gpgkey_result.stdout }}"
+      msg: "{{ hammer_centos8_gpgkey_result }}"
+
+  - name: Print repository_sets defined
+    debug:
+      msg: "{{ item.name }}"
+    throttle: 1
+    with_flattened: "{{ satellite_products }}"
+    when: item.repository_sets is defined
+
+  - name: Print repositories defined
+    debug:
+      msg: "{{ item.name }}"
+    throttle: 1
+    with_flattened: "{{ satellite_products }}"
+    when: item.repositories is defined
+
+  - name: Sync repository_sets defined
+    redhat.satellite.repository_sync:
+      product: "{{ item.name }}"
+      organization: "Default Organization"
+      server_url: "{{ satellite_server_url }}"
+      username: "{{ satellite_username }}"
+      password: "{{ sat_pass }}"
+    throttle: 1
+    with_flattened: "{{ satellite_products }}"
+    when: item.repository_sets is defined
+
+  - name: Sync repositories defined
+    redhat.satellite.repository_sync:
+      product: "{{ item.name }}"
+      organization: "Default Organization"
+      server_url: "{{ satellite_server_url }}"
+      username: "{{ satellite_username }}"
+      password: "{{ sat_pass }}"
+    throttle: 1
+    with_flattened: "{{ satellite_products }}"
+    when: item.repositories is defined
 
   # https://projects.theforeman.org/issues/10266
   - name: disconnected mode
@@ -234,3 +300,27 @@
   - name: unregister
     redhat_subscription:
       state: absent
+
+  - name: remove any persistent udev rules
+    file:
+      path: /etc/udev/rules.d/70-persistent-net.rules
+      state: absent
+ 
+  - name: remove HWADDR MAC line from ifcfg-eth0
+    lineinfile:
+      path: /etc/sysconfig/network-scripts/ifcfg-eth0
+      state: absent
+      regexp: '^HWADDR'  
+
+  - name: build ssh_host_ file list from wildcard
+    find:
+      paths: /etc/ssh
+      patterns: "^ssh_host_"
+      use:regex: true
+    register: ssh_host_files_to_delete
+
+  - name: remove ssh_host_ files
+    file:
+      path: "{{ item.path }}"
+      state: absent
+    with_items: "{{ ssh_host_files_to_delete.files }}"
