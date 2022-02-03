@@ -97,6 +97,12 @@
     tags:
       - software
 
+  - name: Check if Satellite is installed and running
+    shell: >-
+      satellite-maintain service status --brief | grep 'All services are running'
+    ignore_errors: true
+    register: satellite_status
+
   - name: run installer
     include_role:
       name: redhat.satellite_operations.installer
@@ -105,12 +111,18 @@
       satellite_installer_options:
           - "--foreman-initial-admin-password {{ sat_pass }}"
       satellite_installer_command: satellite-installer
+    when:
+      - satellite_status.stdout is defined
+      - not 'OK' in satellite_status.stdout
     tags:
       - software
 
   - name: import manifest
     include_role:
       name: redhat.satellite.manifest
+    when:
+      - satellite_status.stdout is defined
+      - not 'OK' in satellite_status.stdout
     tags:
       - post_software
 
@@ -143,11 +155,23 @@
     command: foreman-rake foreman_openscap:bulk_upload:default
 
   # work around for https://bugzilla.redhat.com/show_bug.cgi?id=1791340
+  - name: determine correct smart_proxy_dynflow_core directory name from wildcard
+    find:
+      paths: /opt/theforeman/tfm/root/usr/share/gems/gems
+      file_type: directory
+      patterns: "^smart_proxy_dynflow_core-"
+      use_regex: true
+    register: smart_proxy_dynflow_core_path
+
+  - debug:
+      msg: "{{ smart_proxy_dynflow_core_path }}"
+
   - name: workaround for bug 1791340
     lineinfile:
-      path: /opt/theforeman/tfm/root/usr/share/gems/gems/smart_proxy_dynflow_core-0.2.6/smart_proxy_dynflow_core.gemspec
+      path: "{{ item.path }}/smart_proxy_dynflow_core.gemspec"
       regexp: gem.authors
       line: "  gem.authors       = ['Ivan Necas']"
+    with_items: "{{ smart_proxy_dynflow_core_path.files }}"
     tags:
      - post_software
 
@@ -173,7 +197,7 @@
     get_url:
       url: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-7
       dest: /etc/pki/rpm-gpg/import
-      mode: '0440'
+      mode: '0444'
     register: getcentos7gpgkey
     until: getcentos7gpgkey is succeeded
 
@@ -181,7 +205,7 @@
     get_url:
       url: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
       dest: /etc/pki/rpm-gpg/import
-      mode: '0440'
+      mode: '0444'
     register: getcentos8gpgkey
     until: getcentos8gpgkey is succeeded
 
@@ -202,17 +226,6 @@
     debug:
       msg: "The Org Id selected is: {{ sat_org_id[0] }}"
 
-#  - name: hammer create RPM-GPG-KEY-CentOS-7 key
-#    command: >-
-#      hammer content-credentials create --organization-id {{ sat_org_id[0] }}
-#      --path "/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-7"
-#      --name "RPM-GPG-KEY-CentOS-7"
-#      --content-type gpg_key
-#    environment:
-#      HOME: /root
-#    register: hammer_centos7_gpgkey_result
-#    ignore_errors: true
-
   - name: Create RPM-GPG-KEY-CentOS-7 key
     redhat.satellite.content_credential:
       name: "RPM-GPG-KEY-CentOS-7"
@@ -229,23 +242,12 @@
     debug:
       msg: "{{ hammer_centos7_gpgkey_result }}"
 
-#  - name: hammer create RPM-GPG-KEY-CentOS-8 key
-#    command: >-
-#      hammer content-credentials create --organization-id {{ sat_org_id[0] }}
-#      --path "/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-Official"
-#      --name "RPM-GPG-KEY-CentOS-8"
-#      --content-type gpg_key
-#    environment:
-#      HOME: /root
-#    register: hammer_centos8_gpgkey_result
-#    ignore_errors: true
-
   - name: Create RPM-GPG-KEY-CentOS-8 key
     redhat.satellite.content_credential:
       name: "RPM-GPG-KEY-CentOS-8"
       organization: "Default Organization"
       content_type: gpg_key
-      content: "{{ lookup('file', '/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-8') }}"
+      content: "{{ lookup('file', '/etc/pki/rpm-gpg/import/RPM-GPG-KEY-CentOS-Official') }}"
       server_url: "{{ satellite_server_url }}"
       username: "{{ satellite_username }}"
       password: "{{ sat_pass }}"
@@ -317,7 +319,7 @@
     find:
       paths: /etc/ssh
       patterns: "^ssh_host_"
-      use:regex: true
+      use_regex: true
     register: ssh_host_files_to_delete
 
   - name: remove ssh_host_ files
