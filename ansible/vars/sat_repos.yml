@@ -27,11 +27,7 @@ satellite_products:
         releasever: 7Server
       - name: Red Hat Enterprise Linux 7 Server - Extras (RPMs)
         basearch: x86_64
-      - name: Red Hat Enterprise Linux 6 Server - Extras (RPMs)
-        basearch: x86_64
       - name: Red Hat Satellite Tools 6.10 (for RHEL 7 Server) (RPMs)
-        basearch: x86_64
-      - name: Red Hat Satellite Tools 6.10 (for RHEL 6 Server) (RPMs)
         basearch: x86_64
   - name: Community Enterprise OS 7
     repositories:
@@ -55,8 +51,3 @@ satellite_products:
       - name: Foreman Client CentOS 7
         url: https://yum.theforeman.org/client/latest/el7/x86_64/
         content_type: yum
-  #- name: Red Hat Enterprise Linux Server - Extended Life Cycle Support
-  #  sync: true
-  #  repository_sets:
-  #    - name: Red Hat Enterprise Linux 6 Server - Extended Life Cycle Support (RPMs)
-  #      basearch: x86_64
