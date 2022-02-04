@@ -282,6 +282,10 @@
     throttle: 1
     with_flattened: "{{ satellite_products }}"
     when: item.repository_sets is defined
+    register: repo_sets_sync
+    retries: 2
+    delay: 15
+    until: repo_sets_sync is not failed
 
   - name: Sync repositories defined
     redhat.satellite.repository_sync:
@@ -293,6 +297,10 @@
     throttle: 1
     with_flattened: "{{ satellite_products }}"
     when: item.repositories is defined
+    register: repo_sync
+    retries: 2
+    delay: 15
+    until: repo_sync is not failed
 
   # https://projects.theforeman.org/issues/10266
   - name: disconnected mode
